@@ -1,0 +1,31 @@
+-- Service Request Highest Composite Score using vw_Workorder_Leaderboard from dbo.DimWorkOrder -- 
+
+
+SR_CompositeScore_MTD = 
+-- Create a Measure to 'decide' when percentage scores are equal in the TOP N ranking based on Completion % and Avg Days to Complete 
+VAR _MTD_Completion = [ServiceRequest_PercentCompleted_ThisMonth] -- normalized percentage
+VAR _AVG_Dif_From_MaxDays = [MaxDays_ThisMonth] - [ServiceRequests_AVG_Days_To_Complete_This_Month] -- Invert the time range for weighting 
+
+VAR WeightedPercentage = _MTD_Completion * 0.75
+VAR WeightedTime = _AVG_Dif_From_MaxDays * 0.25
+RETURN (WeightedPercentage + WeightedTime) / (0.75 + 0.25) 
+
+--------------------------------------------------------------------------------------------------
+
+
+RANKX_SR_Highest_CompositeScore_MTD = 
+VAR Property_Rank=
+    RANKX(
+        ALLSELECTED(vw_PropertyDesignations[PropertyNameDisplay]), 
+        [SR_CompositeScore_MTD],,
+        DESC,
+        Dense
+        )
+VAR _Result = 
+IF(
+    ISINSCOPE('vw_PropertyDesignations'[PropertyNameDisplay])
+    && [SR_CompositeScore_MTD] <> 0,
+    Property_Rank
+) 
+
+RETURN _Result
